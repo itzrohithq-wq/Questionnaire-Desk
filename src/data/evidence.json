@@ -1,0 +1,163 @@
+{
+ "company": "Northwind Synthetic Ltd",
+ "documents": [
+  {
+   "id": "access-control",
+   "file": "access-control.md",
+   "title": "Access Control Policy",
+   "version": "v2.1",
+   "reviewed": "2026-08-14",
+   "status": "Current"
+  },
+  {
+   "id": "encryption",
+   "file": "encryption.md",
+   "title": "Encryption Standard",
+   "version": "v1.4",
+   "reviewed": "2026-07-02",
+   "status": "Current"
+  },
+  {
+   "id": "incident-response",
+   "file": "incident-response.md",
+   "title": "Incident Response Plan",
+   "version": "v3.0",
+   "reviewed": "2026-06-20",
+   "status": "Current"
+  },
+  {
+   "id": "backup-dr",
+   "file": "backup-dr.md",
+   "title": "Backup and Recovery Policy",
+   "version": "v1.8",
+   "reviewed": "2026-05-30",
+   "status": "Current"
+  },
+  {
+   "id": "assurance",
+   "file": "assurance.md",
+   "title": "Assurance Summary",
+   "version": "v1.1",
+   "reviewed": "2026-09-01",
+   "status": "Current, SOC 2 audit in progress"
+  },
+  {
+   "id": "vendor-hr-change",
+   "file": "vendor-hr-change.md",
+   "title": "Vendor, HR and Change Policies",
+   "version": "v1.3",
+   "reviewed": "2026-04-12",
+   "status": "Current"
+  }
+ ],
+ "passages": [
+  {
+   "id": "access-control-1",
+   "doc": "access-control",
+   "section": "Access control",
+   "text": "Multi-factor authentication is required for all employee accounts."
+  },
+  {
+   "id": "access-control-2",
+   "doc": "access-control",
+   "section": "Access control",
+   "text": "MFA for customer end users is optional."
+  },
+  {
+   "id": "access-control-3",
+   "doc": "access-control",
+   "section": "Access control",
+   "text": "Production access is restricted to authorized engineers and reviewed quarterly."
+  },
+  {
+   "id": "access-control-4",
+   "doc": "access-control",
+   "section": "Customer data separation",
+   "text": "The platform is multi-tenant with logical separation of customer data by tenant ID."
+  },
+  {
+   "id": "assurance-1",
+   "doc": "assurance",
+   "section": "Assurance",
+   "text": "A third party performs penetration tests annually."
+  },
+  {
+   "id": "assurance-2",
+   "doc": "assurance",
+   "section": "Assurance",
+   "text": "The SOC 2 Type II audit is in progress and no report is available yet."
+  },
+  {
+   "id": "backup-dr-1",
+   "doc": "backup-dr",
+   "section": "Backup and recovery",
+   "text": "Backups are performed daily and retained for 35 days."
+  },
+  {
+   "id": "backup-dr-2",
+   "doc": "backup-dr",
+   "section": "Backup and recovery",
+   "text": "Restore tests are performed quarterly."
+  },
+  {
+   "id": "backup-dr-3",
+   "doc": "backup-dr",
+   "section": "Backup and recovery",
+   "text": "Customer data is deleted within 30 days of contract termination."
+  },
+  {
+   "id": "encryption-1",
+   "doc": "encryption",
+   "section": "Encryption",
+   "text": "Customer data at rest is encrypted with AES-256."
+  },
+  {
+   "id": "encryption-2",
+   "doc": "encryption",
+   "section": "Encryption",
+   "text": "Data in transit is protected with TLS 1.2 or higher."
+  },
+  {
+   "id": "encryption-3",
+   "doc": "encryption",
+   "section": "Encryption",
+   "text": "Encryption keys are managed in a cloud key management service."
+  },
+  {
+   "id": "incident-response-1",
+   "doc": "incident-response",
+   "section": "Incident response",
+   "text": "We maintain a documented incident response plan that is tested annually."
+  },
+  {
+   "id": "incident-response-2",
+   "doc": "incident-response",
+   "section": "Incident response",
+   "text": "Affected customers are notified within 72 hours of a confirmed breach."
+  },
+  {
+   "id": "incident-response-3",
+   "doc": "incident-response",
+   "section": "Incident response",
+   "text": "We do not currently run red-team exercises."
+  },
+  {
+   "id": "vendor-hr-change-1",
+   "doc": "vendor-hr-change",
+   "section": "Vendor management",
+   "text": "We maintain a vendor risk management process with annual reviews of critical vendors."
+  },
+  {
+   "id": "vendor-hr-change-2",
+   "doc": "vendor-hr-change",
+   "section": "Human resources",
+   "text": "Background checks are performed for all new hires where permitted by law."
+  },
+  {
+   "id": "vendor-hr-change-3",
+   "doc": "vendor-hr-change",
+   "section": "Change management",
+   "text": "All production changes require a reviewed pull request and automated tests."
+  }
+ ]
+}

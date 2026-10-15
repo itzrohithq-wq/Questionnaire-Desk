@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Design tokens. Lime is a fill colour (always with ink text); on white, accent text uses --color-accent-ink for contrast. */
+@theme {
+  --color-paper: #f5f6f4;
+  --color-panel: #ffffff;
+  --color-sunken: #fafaf8;
+  --color-ink: #171717;
+  --color-muted: #6b6b6b;
+  --color-line: #eeeeec;
+  --color-line-strong: #d9d9d5;
+  --color-accent: #a7ff35;
+  --color-accent-hover: #98f01f;
+  --color-accent-soft: #f1ffd9;
+  --color-accent-edge: #6fb800;
+  --color-accent-ink: #3a6100;
+  --color-marker: #fff1a8;
+  --color-warn: #8a5a00;
+  --color-warn-soft: #fff4d6;
+  --color-danger: #a12a2a;
+  --color-danger-soft: #fdeceb;
+  --color-ok: #1f6b4a;
+  --color-ok-soft: #e6f3ec;
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-serif: "Source Serif 4 Variable", Georgia, "Times New Roman", serif;
+  --radius-card: 20px;
+  --shadow-soft: 0 1px 2px rgb(23 23 23 / 0.04), 0 8px 24px -12px rgb(23 23 23 / 0.08);
+  --shadow-lift: 0 1px 2px rgb(23 23 23 / 0.05), 0 14px 32px -14px rgb(23 23 23 / 0.16);
+}
+
+html { zoom: 0.67; background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans); }
+body { min-height: 100vh; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; border-radius: 10px; box-shadow: 0 0 0 5px var(--color-accent); }
+
+/* Components */
+.card { background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-soft); transition: box-shadow .2s ease, transform .2s ease; }
+.card-hover:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+.btn { white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: 999px; border: 1px solid var(--color-line-strong); background: var(--color-panel); padding: .5rem 1rem; font-size: .875rem; font-weight: 500; color: var(--color-ink); transition: background-color .15s ease, border-color .15s ease, transform .1s ease, box-shadow .15s ease; }
+.btn:hover:not(:disabled) { background: var(--color-sunken); border-color: var(--color-ink); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { cursor: not-allowed; opacity: .45; }
+.btn-primary { background: var(--color-accent); border-color: var(--color-accent); font-weight: 600; box-shadow: 0 6px 16px -8px rgb(111 184 0 / .7); }
+.btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.btn-ink { background: var(--color-ink); border-color: var(--color-ink); color: #fff; font-weight: 600; }
+.btn-ink:hover:not(:disabled) { background: #2b2b2b; border-color: #2b2b2b; }
+.icon-btn { position: relative; display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 999px; color: var(--color-muted); transition: background-color .15s ease, color .15s ease, transform .1s ease; }
+.icon-btn:hover { background: var(--color-sunken); color: var(--color-ink); }
+.icon-btn:active { transform: scale(.94); }
+.tip { pointer-events: none; position: absolute; left: calc(100% + 10px); top: 50%; translate: 0 -50%; white-space: nowrap; border-radius: 8px; background: var(--color-ink); color: #fff; padding: .25rem .5rem; font-size: .75rem; opacity: 0; transition: opacity .15s ease; z-index: 40; }
+.icon-btn:hover .tip, .icon-btn:focus-visible .tip { opacity: 1; }
+.field { width: 100%; border-radius: 14px; border: 1px solid var(--color-line-strong); background: var(--color-sunken); padding: .5rem .75rem; transition: border-color .15s ease, background-color .15s ease; }
+.field:focus { background: #fff; border-color: var(--color-ink); }
+.pill-tab { border-radius: 999px; padding: .5rem .75rem; font-size: .875rem; font-weight: 500; transition: background-color .2s ease, color .2s ease; }
+.pill-tab[aria-pressed="true"] { background: var(--color-ink); color: #fff; }
+
+/* Visual grammar of trust: dashed edge + hatch = software suggestion, nobody has reviewed it; solid lime edge = approved by the reviewer. */
+.suggestion { border: 2px dashed #a3a3a0; background: repeating-linear-gradient(135deg, #fcfcfb, #fcfcfb 10px, #f6f6f4 10px, #f6f6f4 20px); }
+.approved { border: 2px solid var(--color-accent-edge); background: var(--color-accent-soft); }
+.passage { font-family: var(--font-serif); line-height: 1.6; }
+.marker { background: linear-gradient(transparent 12%, var(--color-marker) 12%, var(--color-marker) 92%, transparent 92%); padding: 0 2px; }
+
+.tour-target { outline: 3px solid var(--color-ink); outline-offset: 4px; border-radius: 22px; box-shadow: 0 0 0 7px var(--color-accent); transition: box-shadow .2s; }
+
+.skeleton { border-radius: 12px; background: linear-gradient(90deg, #efefec 25%, #f7f7f4 50%, #efefec 75%); background-size: 200% 100%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .stamp { animation: stamp .28s cubic-bezier(.2, .9, .3, 1.2); }
+  .rise { animation: rise .35s ease-out both; }
+  .skeleton { animation: shimmer 1.4s linear infinite; }
+  @keyframes stamp { from { transform: scale(.96); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+  @keyframes rise { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+}
+/* Page transitions: the whole page softly cross-fades; the center column (the question being reviewed) slides in. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) { animation: vt-out .18s ease both; }
+  ::view-transition-new(root) { animation: vt-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+  @keyframes vt-out { to { opacity: 0; transform: translateY(-6px); } }
+  @keyframes vt-in { from { opacity: 0; transform: translateY(10px); } }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+.sr-only-focusable:not(:focus) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

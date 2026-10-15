@@ -1,0 +1,191 @@
+[
+ {
+  "id": "Q1",
+  "row": 2,
+  "question": "Do you enforce MFA for all employee accounts?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q2",
+  "row": 3,
+  "question": "Do you enforce MFA for customer end users?",
+  "status": "NEEDS_HUMAN",
+  "answer": null,
+  "passage": "access-control-2",
+  "note": "evidence is negative, partial or conditional"
+ },
+ {
+  "id": "Q3",
+  "row": 4,
+  "question": "Is customer data encrypted at rest?",
+  "status": "SUGGESTED",
+  "answer": "Yes",
+  "passage": "encryption-1",
+  "note": ""
+ },
+ {
+  "id": "Q4",
+  "row": 5,
+  "question": "Is data encrypted in transit using TLS 1.3?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q5",
+  "row": 6,
+  "question": "Do you hold a SOC 2 Type II report?",
+  "status": "NEEDS_HUMAN",
+  "answer": null,
+  "passage": "assurance-2",
+  "note": "evidence is negative, partial or conditional"
+ },
+ {
+  "id": "Q6",
+  "row": 7,
+  "question": "Do you hold ISO 27001 certification?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q7",
+  "row": 8,
+  "question": "Do you have FedRAMP authorization?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q8",
+  "row": 9,
+  "question": "How often are backups performed?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q9",
+  "row": 10,
+  "question": "Do you test restores from backups?",
+  "status": "SUGGESTED",
+  "answer": "Yes",
+  "passage": "backup-dr-2",
+  "note": ""
+ },
+ {
+  "id": "Q10",
+  "row": 11,
+  "question": "Do you have a documented incident response plan?",
+  "status": "SUGGESTED",
+  "answer": "Yes",
+  "passage": "incident-response-1",
+  "note": ""
+ },
+ {
+  "id": "Q11",
+  "row": 12,
+  "question": "Within how many hours do you notify customers of a confirmed breach?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q12",
+  "row": 13,
+  "question": "Do you perform annual penetration tests by a third party?",
+  "status": "SUGGESTED",
+  "answer": "Yes",
+  "passage": "assurance-1",
+  "note": ""
+ },
+ {
+  "id": "Q13",
+  "row": 14,
+  "question": "Do you conduct red team exercises?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q14",
+  "row": 15,
+  "question": "Do you perform background checks on employees?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q15",
+  "row": 16,
+  "question": "Do you have a vendor risk management process?",
+  "status": "SUGGESTED",
+  "answer": "Yes",
+  "passage": "vendor-hr-change-1",
+  "note": ""
+ },
+ {
+  "id": "Q16",
+  "row": 17,
+  "question": "Do you restrict production access to authorized personnel only?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q17",
+  "row": 18,
+  "question": "Is there a formal change management process?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q18",
+  "row": 19,
+  "question": "Do you logically separate customer data?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q19",
+  "row": 20,
+  "question": "Do you allow customers to audit your facilities on-site?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q20",
+  "row": 21,
+  "question": "Do you use hardware security modules for key storage?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ },
+ {
+  "id": "Q21",
+  "row": 22,
+  "question": "Do you run a public bug bounty program?",
+  "status": "NO_EVIDENCE",
+  "answer": null,
+  "passage": null,
+  "note": "no supporting passage found"
+ }
+]
