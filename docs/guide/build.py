@@ -1,265 +1,325 @@
 """Generates guide.html (A4 landscape, print-ready) for the Questionnaire desk demo.
-Run: python docs/guide/build.py && node docs/guide/render.mjs
-Screens in img/ are captured from the running app by capture.mjs. The export table is read from a real exported workbook."""
-import html, json, os, sys
+Run:  node docs/guide/capture.mjs  ->  python docs/guide/build.py  ->  node docs/guide/render.mjs
+Screens in img/ are captured from the live app by capture.mjs. Every picture is scaled to FIT its box (never cropped).
+The export table is read from a real file exported from the live app (img/export.xlsx)."""
+import html, json, os
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-APP = 'http://localhost:3100/'
+LIVE = 'https://questionnaire-desk.vercel.app/'
 VERSION, DATE = '0.1.0', '2026-10-15'
-EXPORT = os.environ.get('EXPORT_XLSX', '')
+IMG = os.path.join(HERE, 'img')
 
 def e(s): return html.escape(s, quote=True)
 
-# ---- Feature pages: (anchor, title, location, purpose, images, caption, success, steps, note) ----
-# images: list of (file, css-class) ; classes: '' full-width, 'crop-top' fixed-height crop, 'narrow'
-F = [
- dict(id='welcome', title='Start from the welcome screen', where='First page you see when the app opens.',
-  purpose='Explains what the demo is and lets you try the key idea (a suggestion is not an answer until a person approves it) before you open the questionnaire.',
-  imgs=[('welcome-hero', 'tall'), ('welcome-card', 'tall')], row=True, cap='Left: the headline and the two buttons. Right: a small interactive example, not part of your questionnaire.',
-  ok='The headline reads “Security questionnaires answered from your approved policies”, and the example card shows a dashed “Software suggestion, not yet reviewed” box.',
-  steps=['Read the notes under the example card: the demo runs in your browser, matching is keyword matching and not AI, you act as the reviewer, and real company files must not be loaded.',
-         'Select “Approve this suggestion” in the example card. The dashed box turns into a solid green-edged “Approved by the reviewer” box. Select “Undo approval” to return.',
-         'Select “Start the interactive demo” to open the questionnaire. “Download the sample questionnaire” saves the fictional Excel file.'],
-  note='Cost: none. Nothing is uploaded; the sample file is served from the same place as the app.'),
- dict(id='questions', title='Choose a question from the list', where='Workspace, left column “Questionnaire”.',
-  purpose='Shows all 21 questions of the sample workbook with a status for each, so you can see what needs a person.',
-  imgs=[('question-list', 'tall'), ('question-list-reviewed', 'tall')], row=True, cap='Left: the first questions before any review. Right: the same rows after reviewing. A selected row has a dark border and a lime bar; each row shows a written status.',
-  ok='The row you chose is outlined and the centre and right columns show that question. Statuses are always written out, never colour only.',
-  steps=['Select any question. You can also focus the list and press the Down and Up arrow keys, Home or End to move between questions.',
-         'Read the status chip. “Suggested, needs review” means the software drafted an answer. “Needs your judgment” and “No supporting evidence” mean it drafted nothing.',
-         'Work through the list in any order. Your choices are kept for the rest of this browser tab session.'],
-  note='In the sample, 5 questions have a suggestion, 2 need your judgment and 14 have no supporting evidence. This is deliberate and shows the matcher’s limits.'),
- dict(id='progress', title='Track review progress', where='Workspace, centre column, above the question.',
-  purpose='Counts how many answers you have approved, how many are still waiting, and how many you have held back.',
-  imgs=[('stats-reviewed', 'fit')], cap='Progress after approving three answers, rejecting one and holding one. The strip shows one tick per question.',
-  ok='“Approved” goes up when you approve, “Held back” counts rejected and needs-more-evidence items, and the sentence below reads “N approved, M of 21 reviewed”.',
-  steps=['Approve, reject or hold a question (see the next pages).',
-         'Watch the three tiles update. “Awaiting review” is everything not yet approved, rejected or held back.',
-         'Use the tick strip as a quick map: green ticks are approved, red are rejected, amber are held back, grey are untouched.'],
-  note='The numbers describe this session only. They are not metrics from a real customer.'),
- dict(id='suggestion', title='Read a software suggestion', where='Workspace, centre column, the large answer box.',
-  purpose='Shows what the software proposes and, just as important, that nobody has reviewed it yet.',
-  imgs=[('question-head', 'fit'), ('answer-suggested', 'fit')], cap='Question 3. The dashed, hatched edge means “software suggestion, not yet reviewed”. The line under the answer names the policy it cites.',
-  ok='You see an answer such as “Yes”, the title “Software suggestion, not yet reviewed”, and “Cites Encryption Standard v1.4, Encryption.”',
-  steps=['Select Question 3, “Is customer data encrypted at rest?”.',
-         'Read the answer and the citation line. The suggestion exists only because a policy passage matched the question.',
-         'Do not treat it as final. The next pages show how to check the passage and approve it.'],
-  note='The suggestion is software output from keyword matching. It is not AI and has not been reviewed by an expert.'),
- dict(id='flags', title='When the software drafts nothing', where='Workspace, centre column, above the answer box.',
-  purpose='Explains why some questions have no suggested answer, so a gap is never filled with an invented control.',
-  imgs=[('flag-needs-human', 'fit'), ('flag-no-evidence', 'fit')], cap='Top: Question 2 has a closest passage that is negative, partial or conditional. Bottom: Question 1 has no matching passage.',
-  ok='The answer box reads “No suggested answer” and “Nothing to approve yet.”, and the Approve button is disabled.',
-  steps=['Select Question 1 or Question 2.',
-         'Read the note. “Needs your judgment” points you to the closest passage in Cited evidence. “No supporting evidence” means the matcher found nothing and may have missed different wording.',
-         'If a policy does cover it, write the answer yourself (see “Edit and cite your own answer”).'],
-  note='This is intentional: the demo prefers a blank to a guess.'),
- dict(id='evidence', title='Check the cited evidence', where='Workspace, right column, “Cited evidence”.',
-  purpose='Shows the exact policy passage behind a suggestion, with the document name, version, review date and status.',
-  imgs=[('evidence-cited', 'fit')], cap='Evidence for Question 3. The yellow highlight is the exact source sentence, set in a serif face to mark it as source text.',
-  ok='A card names the document (for example Encryption Standard, v1.4), its status and section, and highlights the passage.',
-  steps=['Select a question that has a suggestion, such as Question 3.',
-         'Read the highlighted sentence and compare it with the question. Check the version and the “Status” line.',
-         'If the passage does not really answer the question, do not approve. Reject it or mark it as needing more evidence.'],
-  note='All documents are fictional. Source text is shown as written; generated text is never mixed into it.'),
- dict(id='library', title='Browse the evidence library', where='Workspace, right column, “Evidence library”.',
-  purpose='Lists all six fictional policies and their passages so you can find support that the matcher missed.',
-  imgs=[('library', 'fit')], cap='The library with the Encryption Standard open. The passage cited by the current question has a yellow background.',
-  ok='Each policy opens to show its version, review date, status and numbered passages. The document that is cited stays open.',
-  steps=['Select a policy name to expand it.',
-         'Read its passages. They are fixed source text and cannot be edited in the demo.',
-         'When you find a passage that answers a question the software missed, note its wording and use it in “Edit and cite your own answer”.'],
-  note='The library holds 6 documents with 18 passages in total. It is part of the build, not uploaded by you.'),
- dict(id='approve', title='Approve a suggestion', where='Workspace, right column, “Reviewer actions”.',
-  purpose='Records that you checked the answer and its evidence. Only approved answers can be exported.',
-  imgs=[('actions', 'fit'), ('answer-approved', 'fit')], cap='The reviewer actions, and the answer box after approval: solid green edge and the note that it will be written to the Excel file.',
-  ok='The title changes to “Approved answer”, the chip reads “Approved”, and “Export Excel (N approved)” counts it.',
-  steps=['Select Question 3 and check its cited evidence.',
-         'Select “Approve”. The button is disabled when there is no answer, or when a dropdown question has a value outside Yes, No or N/A.',
-         'Select “Restore the original suggestion” if you want to undo your changes and return to the software’s first suggestion.'],
-  note='Approval is a person’s decision. In this demo that person is you; the demo does not claim any expert reviewed the answer.'),
- dict(id='hold', title='Reject or hold an answer', where='Workspace, right column, “Reviewer actions”.',
-  purpose='Keeps weak or unsupported answers out of the export.',
-  imgs=[('answer-rejected', 'fit')], cap='A rejected answer. The cell stays blank in the export.',
-  ok='The chip reads “Rejected, will not export” or “More evidence needed”, and the answer box says the cell stays blank.',
-  steps=['Select a question whose evidence does not support the answer.',
-         'Select “Reject” to discard the suggestion, or “Needs more evidence” if you need a better policy passage first.',
-         'You can still change your mind: select “Approve” later, or edit the answer first.'],
-  note='Rejected and held answers are never exported.'),
- dict(id='edit', title='Edit and cite your own answer', where='Reviewer actions, “Edit answer”.',
-  purpose='Lets you answer a question the software missed, or correct a suggestion, and tie the answer to a policy passage.',
-  imgs=[('edit-form', 'fit')], cap='The edit form for a dropdown question. “Cited evidence” offers every passage in the library.',
-  ok='After “Save edit” the chip reads “Edited, needs approval” and the answer box is dashed again, titled “Your edit, waiting for your approval”.',
-  steps=['Select “Edit answer”. Choose Yes, No or N/A (the workbook cell is a dropdown) and optionally type a comment.',
-         'Choose the supporting passage in “Cited evidence”. Choosing “No evidence cited” is allowed but is recorded as such.',
-         'Select “Save edit”, then select “Approve” as a separate step.'],
-  note='Every edit withdraws an earlier approval. If you approve with no cited passage, the export says “Source: none cited; answer entered by the reviewer.”'),
- dict(id='export', title='Export the reviewed Excel file', where='Header, top right: “Export Excel (N approved)”.',
-  purpose='Writes only approved answers into a copy of the sample workbook and keeps its formatting.',
-  imgs=[('header-export', 'wide')], cap='Top: the export button. Below: the first rows of a real exported file in which only Question 3 and Question 9 were approved.', table=True,
-  ok='A file named Northwind-Security-Questionnaire-reviewed.xlsx downloads. Approved rows have an answer and a “Source:” line in the comments column; every other row is blank.',
-  steps=['Approve at least one answer. The button is disabled while the count is 0.',
-         'Select “Export Excel (N approved)”. Your browser saves the file; nothing is sent anywhere.',
-         'Open the file in Excel and check the Response and Comments columns against what you approved.'],
-  note='Sheet order, hidden sheets, widths, heights, merges, basic formatting, dropdowns, conditional formatting and freeze panes were checked on the sample only. Images, charts and macros are not supported.'),
- dict(id='tour', title='Take the guided tour', where='Left sidebar, compass icon “Guided tour” (on phones: the “Guided tour” button in the header).',
-  purpose='A five-step walkthrough that moves to the right place and outlines each area.',
-  imgs=[('tour', 'fit'), ('sidebar', 'tall')], row=True, cap='Left: the tour card, which stays out of your way at the bottom right. Right: the sidebar tools with their tooltip.',
-  ok='A card titled “Review the questionnaire” appears, “Step 1 of 5”, and the question list is outlined.',
-  steps=['Select “Guided tour”.',
-         'Use “Next” and “Back”. The steps cover the list, the evidence, a suggestion, the actions and the export button.',
-         'Select “Finish” on step 5, or “End the guide” (or press Escape) at any time.'],
-  note='From step 2 the tour opens Question 3 for you. It does not reset your review choices.'),
- dict(id='limits', title='Read what the demo can and cannot do', where='Left sidebar, info icon “Limits” (on phones: the “Limits” button).',
-  purpose='States the export support list, the matching method and the data handling in one place.',
-  imgs=[('limits', 'crop-top')], cap='The top of the Limits dialog. It continues with the unsupported list, matching and data notes.',
-  ok='A dialog titled “What this demo can and cannot do” opens and focus moves into it.',
-  steps=['Select “Limits”.',
-         'Read “The Excel export keeps” and “The Excel export does not support”.',
-         'Select “Close”, press Escape, or select outside the dialog.'],
-  note='Fidelity is checked on the sample workbook only, not promised for every file.'),
- dict(id='mobile', title='Use the demo on a phone or tablet', where='Any screen narrower than a laptop.',
-  purpose='The three columns become three tabs so each screen stays readable.',
-  imgs=[('mobile-questions', 'phone')], cap='A 390 pixel wide screen. The tabs along the bottom switch between Questions, Answer, and Evidence and review.',
-  ok='A pill-shaped tab bar sits at the bottom and “Guided tour”, “Limits” and “Reset demo” appear as labelled buttons under the title.',
-  steps=['Select a question. The app switches to the Answer tab.',
-         'Select the “Evidence and review” tab to see cited evidence and the reviewer actions.',
-         'Select “Export Excel (N approved)” in the header when you are done.'],
-  note='There is no horizontal scrolling at phone width. Tested at 390 pixels wide in an automated browser, not on physical devices.'),
- dict(id='reset', title='Reset the demo and what is remembered', where='Left sidebar, circular-arrow icon “Reset demo”.',
-  purpose='Clears every approval, rejection, edit and hold so you can run the demo again.',
-  imgs=[('sidebar', 'tall')], cap='The three sidebar tools: Guided tour, Limits and Reset demo. The tooltip names a tool when you point at it.',
-  ok='A short message says “Demo reset. All review choices were cleared.” and all counts return to 0 approved, 21 awaiting review.',
-  steps=['Select “Reset demo”.',
-         'Check that “Export Excel (0 approved)” is disabled again.',
-         'To start fully fresh, close the browser tab. Choices are kept only in that tab’s session storage.'],
-  note='Review choices are not saved on a server and are not shared between tabs or devices.'),
-]
+VIS = json.load(open(os.path.join(HERE, 'vis.json'), encoding='utf8'))
+# vector pictures rendered from the demo's real components (see vis.guide.test.tsx); names kept short for the page code below
+ALIAS = {'list5': 'list-before', 'list5-reviewed': 'list-after', 'mobile-questions': 'phone-questions', 'mobile-evidence': 'phone-evidence',
+         'evidence-cited': 'evidence', 'edit-form': 'answer-edit'}
 
-def img(name, cls):
-    return f'<img class="shot {cls}" src="img/{name}.png" alt="{e(name.replace("-", " "))}">'
+def pic(name, max_w, max_h, cap=0.30, alt=None):
+    """A vector picture. The script in guide.html scales it so the WHOLE picture fits max_w x max_h (mm) and never past `cap` mm per CSS px."""
+    key = ALIAS.get(name, name)
+    v = VIS[key]
+    return (f'<div class="vis" data-w="{v["w"]}" data-maxw="{max_w}" data-maxh="{max_h}" data-cap="{cap}" role="img" aria-label="{e(alt or key.replace("-", " "))}">'
+            f'<div class="vis-box"><div class="vis-in"><template>{v["html"]}</template></div></div></div>')
 
-def export_table():
-    if not EXPORT or not os.path.exists(EXPORT): return ''
-    import openpyxl
-    ws = openpyxl.load_workbook(EXPORT)['Questionnaire']
-    rows = [r for r in range(2, 12) if ws.cell(r, 3).value or r in (2, 3)]
-    out = ['<table class="sheet"><tr><th>ID</th><th>Question</th><th>Response</th><th>Comments / Evidence</th></tr>']
-    for r in rows[:5]:
-        c = [ws.cell(r, i).value or '' for i in range(1, 5)]
-        com = c[3] if len(c[3]) < 150 else c[3][:147] + '…'
-        out.append(f'<tr><td>{e(str(c[0]))}</td><td>{e(str(c[1]))}</td><td>{e(str(c[2]))}</td><td>{e(com)}</td></tr>')
-    out.append('</table>')
-    return ''.join(out)
+# ---------------- steps and page parts ----------------
+def steps(items):
+    return '<ol class="steps">' + ''.join(f'<li><span class="n">{i}</span><p>{s}</p></li>' for i, s in enumerate(items, 1)) + '</ol>'
+
+def ok_panel(text, title='What you should see'):
+    return f'<div class="ok"><strong>{e(title)}</strong><p>{text}</p></div>'
+
+def open_link(note=''):
+    return f'<a class="open" href="{LIVE}">Open Questionnaire desk</a><p class="hint">{LIVE}{(" · " + e(note)) if note else ""}</p>'
 
 pages = []
-def add(pid, label, body, extra_cls=''):
-    pages.append((pid, label, f'<section class="page {extra_cls}" id="{pid}">{body}<footer><a href="#index">Back to index</a><span>Questionnaire desk guide · version {VERSION} · page {{n}}</span></footer></section>'))
+def add(pid, label, body, cls=''):
+    pages.append((pid, label, f'<section class="page {cls}" id="{pid}">{body}<footer><a href="#index">Contents</a><span>Questionnaire desk guide · version {VERSION} · page {{n}}</span></footer></section>'))
 
-LOGO = '<span class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/><path d="m9.2 14.6 2.2 2.2 4.1-4.4"/></svg></span>'
+def head(title, where, purpose):
+    return f'<h2>{e(title)}</h2><dl class="wf"><div><dt>Where</dt><dd>{where}</dd></div><div><dt>What it is for</dt><dd>{purpose}</dd></div></dl>'
 
-def steps_html(steps):
-    return '<ol class="steps">' + ''.join(f'<li><span class="n">{i}</span><p>{e(s)}</p></li>' for i, s in enumerate(steps, 1)) + '</ol>'
+def feature(pid, title, where, purpose, visual, caption, ok, how, note, tall=False):
+    """Normal page: picture + caption + 'what you should see' on the left, steps on the right.
+    Tall page (tall pictures): the picture gets the whole left column; 'what you should see' moves to the right."""
+    if tall:
+        left = f'<div class="shots tallbox">{visual}</div><p class="cap">{e(caption)}</p>'
+        right = f'{steps(how)}{ok_panel(ok)}<p class="note">{e(note)}</p>{open_link()}'
+    else:
+        left = f'<div class="shots">{visual}</div><p class="cap">{e(caption)}</p>{ok_panel(ok)}'
+        right = f'{steps(how)}<p class="note">{e(note)}</p>{open_link()}'
+    add(pid, title, head(title, where, purpose) + f'<div class="cols"><div class="left">{left}</div><div class="right">{right}</div></div>', 'feature')
 
-def feature(f, num):
-    imgs = ''.join(img(n, c) for n, c in f['imgs'])
-    tbl = export_table() if f.get('table') else ''
-    body = f'''<h2>{e(f["title"])}</h2>
-<p class="where"><strong>Where:</strong> {e(f["where"])} <span class="sep"></span> <strong>Purpose:</strong> {e(f["purpose"])}</p>
-<div class="cols"><div class="left"><div class="shots n{len(f["imgs"])}{" row" if f.get("row") else ""}">{imgs}</div>{tbl}<p class="cap">{e(f["cap"])}</p>
-<div class="ok"><strong>What you should see</strong><p>{e(f["ok"])}</p></div></div>
-<div class="right">{steps_html(f["steps"])}<p class="note">{e(f["note"])}</p><a class="open" href="{APP}">Open this part of the app</a><p class="hint">Works while the app is running locally at {APP}</p></div></div>'''
-    add(f['id'], f['title'], body, 'feature')
+# Picture boxes (mm): left column inner width 145; normal height 84, tall height 118
+W1, H1, HT = 145, 84, 118
 
-# 1 Cover
-add('cover', 'Cover', f'''<div class="cover"><div class="cl"><div class="brand">{LOGO}<span>Questionnaire desk</span></div>
-<h1>Review security questionnaires with evidence in front of you.</h1>
-<p class="lead">A hands-on guide to the Questionnaire desk demo: see suggested answers, check the policy behind each one, approve what is right, and export a reviewed Excel file.</p>
-<ul class="labels"><li>Suggested answers</li><li>Cited evidence</li><li>Human review</li><li>Excel export</li><li>Guided tour</li></ul>
-<p class="meta">Demo with fictional data (Northwind Synthetic Ltd) · Runs locally at <a href="{APP}">{APP}</a> · Version {VERSION} · Verified {DATE}</p>
-<p class="meta">Not deployed publicly. Keyword matching, not AI. No expert has reviewed any answer in this demo.</p></div>
-<div class="cr"><img class="shot" src="img/workspace-q3.png" alt="The Questionnaire desk workspace"></div></div>''', 'coverpage')
+# ---------------- Cover ----------------
+LOGO = ('<svg viewBox="70.2 94.9 160 160.4" width="40" height="40" aria-hidden="true">'
+        '<path fill="#a7ff35" d="M76.55 102.02C76.57 101.08 78.36 101.34 79.3 101.39C80.94 101.48 82.59 101.83 84.12 102.46C86.83 103.57 89.6 104.74 91.92 106.54C94.52 108.58 96.77 111.1 98.64 113.82C100.87 117.05 102.6 120.63 104.1 124.25C105.63 127.95 106.76 131.82 107.7 135.7C108.92 140.68 109.9 145.73 110.57 150.81C111.52 158.07 112.18 165.38 112.57 172.69C112.96 179.95 112.42 187.24 112.89 194.5C112.97 195.84 113.52 197.15 114.21 198.3C114.7 199.11 115.5 199.74 116.33 200.2C117.3 200.73 118.39 201.17 119.5 201.21C128.77 201.58 138.07 200.97 147.33 201.44C148 201.47 148.88 202.01 148.91 202.69C149.36 213.55 149.25 224.45 148.71 235.31C148.64 236.84 147.78 238.26 147.09 239.63C146.55 240.69 145.9 241.74 145.03 242.55C143.15 244.31 141.25 246.18 138.91 247.26C136.62 248.33 134.02 248.76 131.5 248.84C118.2 249.24 104.88 249.21 91.58 248.72C89.73 248.65 87.98 247.85 86.27 247.15C85.16 246.7 84.14 246.05 83.19 245.31C82.08 244.45 81.04 243.48 80.15 242.38C79.24 241.26 78.45 240.03 77.86 238.72C77.21 237.27 76.76 235.72 76.44 234.16C76.2 232.96 76.19 231.72 76.19 230.5C76.22 187.67 75.51 144.84 76.55 102.02Z"/>'
+        '<path fill="#171717" d="M106.61 101.59C106.29 100.65 108.51 100.87 109.5 100.87C142.17 100.66 174.84 100.31 207.5 100.96C209.94 101.01 212.38 101.83 214.55 102.95C216.65 104.04 218.51 105.66 220.04 107.47C221.46 109.13 222.52 111.13 223.23 113.2C223.91 115.21 224.15 117.38 224.17 119.5C224.47 161.83 224.5 204.17 224.17 246.5C224.17 247.31 223.82 248.24 223.17 248.72C222.44 249.26 221.4 249.21 220.5 249.22C204.83 249.35 189.16 249.68 173.5 249.13C171.28 249.06 169.04 248.39 167.08 247.35C164.79 246.13 162.77 244.39 161 242.49C159.84 241.24 159.05 239.65 158.42 238.06C157.72 236.28 157.11 234.41 157.06 232.5C156.78 222.32 156.64 212.1 157.43 201.94C157.49 201.2 158.75 201.11 159.5 201.09C170.83 200.79 182.17 201.24 193.5 200.97C194.62 200.95 195.78 200.73 196.78 200.23C197.64 199.79 198.57 199.15 198.88 198.24C199.24 197.18 199.14 195.88 198.61 194.9C197.94 193.66 196.69 192.78 195.51 192C194.23 191.16 192.77 190.58 191.31 190.11C187.49 188.88 183.46 188.32 179.71 186.9C179.06 186.65 178.48 185.94 178.45 185.25C178.16 178.91 178.08 172.51 178.76 166.19C178.83 165.53 179.93 165.46 180.6 165.37C182.59 165.1 184.66 165.51 186.63 165.12C187.33 164.99 188.03 164.49 188.34 163.84C188.77 162.92 188.98 161.78 188.66 160.82C188.37 159.93 187.52 159.23 186.68 158.83C185.71 158.36 184.57 158.26 183.5 158.32C176.86 158.73 170.22 159.21 163.64 160.22C158.43 161.02 153.27 162.21 148.23 163.74C141.46 165.78 134.99 168.71 128.27 170.92C127.85 171.06 127.31 170.98 126.94 170.73C126.53 170.46 126.21 169.98 126.16 169.5C125.75 165.29 125.91 161.03 125.56 156.81C125.13 151.7 124.67 146.57 123.83 141.51C122.97 136.31 121.97 131.1 120.45 126.05C119.12 121.61 117.27 117.34 115.3 113.15C114.38 111.19 113.11 109.4 111.8 107.67C110.2 105.54 107.46 104.11 106.61 101.59ZM164 166.48C165.81 166.12 167.66 165.96 169.5 165.85C170.11 165.81 170.75 165.82 171.32 166.03C171.75 166.18 172.32 166.45 172.36 166.89C172.75 172.4 172.7 177.93 172.56 183.45C172.55 184.14 172.6 185.35 171.91 185.42C165.84 186.03 159.7 185.18 153.6 185.36C150.28 185.46 146.95 185.75 143.66 186.26C138.08 187.13 132.61 188.64 127.02 189.49C126.53 189.56 125.65 189.51 125.6 189.01C125.34 185.91 125.68 182.76 126.19 179.69C126.31 178.98 126.8 178.25 127.45 177.94C133.23 175.22 139.11 172.63 145.2 170.72C151.33 168.8 157.7 167.75 164 166.48Z"/></svg>')
 
-# 2 Index
-order = ['cover', 'index', 'prereq', 'launch', 'first'] + [f['id'] for f in F] + ['dev', 'upload', 'trouble', 'ready']
-pageno = {i: k for k, i in enumerate(order, 1)}
-sections = [('prereq', 'Before you start'), ('launch', 'Launch the app for the first time'), ('first', 'Your first review, end to end')] + [(f['id'], f['title']) for f in F] + [('dev', 'For developers: run the tests and rebuild data'), ('upload', 'For developers: the local-only upload switch'), ('trouble', 'Troubleshooting'), ('ready', 'Readiness checklist')]
-half = (len(sections) + 1) // 2
+add('cover', 'Cover', f'''<div class="cover"><div class="cl"><div class="brand"><span class="logo">{LOGO}</span><span>Questionnaire desk</span></div>
+<h1>Review security questionnaires with the evidence in front of you.</h1>
+<p class="lead">A short, step-by-step guide to the Questionnaire desk demo. You open a sample questionnaire, check each suggested answer against a policy, approve the ones that are right, and download a finished Excel file.</p>
+<ul class="labels"><li>Suggested answers</li><li>Cited evidence</li><li>You approve</li><li>Excel export</li></ul>
+<a class="open big" href="{LIVE}">Open Questionnaire desk</a>
+<p class="meta">{LIVE} · Version {VERSION} · Checked {DATE}<br>Demo with fictional data. Keyword matching, not AI. Nobody but you reviews the answers.</p></div>
+<div class="cr">{pic("workspace", 150, 160, 0.34, "The Questionnaire desk workspace")}</div></div>''', 'coverpage')
+
+# ---------------- Contents ----------------
+FEATURES = [
+    ('welcome', 'Start from the welcome screen'), ('questions', 'Pick a question from the list'), ('progress', 'Follow your progress'),
+    ('suggestion', 'Read a suggested answer'), ('flags', 'When the software drafts nothing'), ('evidence', 'Check the evidence'),
+    ('library', 'Browse the policy library'), ('approve', 'Approve an answer'), ('hold', 'Reject, or ask for more evidence'),
+    ('edit', 'Write your own answer'), ('export', 'Download the Excel file'), ('tour', 'Take the guided tour'),
+    ('limits', 'Read the limits'), ('mobile', 'Use it on a phone'), ('reset', 'Start over'),
+]
+SECTIONS = [('start', 'Start here'), ('glance', 'The screen at a glance'), ('first', 'Your first review in 4 steps')] + FEATURES + [
+    ('dev', 'For developers: run it yourself'), ('trouble', 'If something goes wrong'), ('ready', 'Checklist and limits')]
+order = ['cover', 'index'] + [k for k, _ in SECTIONS]
+pageno = {k: i for i, k in enumerate(order, 1)}
+half = (len(SECTIONS) + 1) // 2
 def col(items, start):
-    return '<ol class="idx" style="counter-reset: n %d">' % (start - 1) + ''.join(f'<li><a href="#{i}">{e(t)}</a><span class="pg">{pageno[i]}</span></li>' for i, t in items) + '</ol>'
-add('index', 'Index', f'''<h2>Contents</h2><p class="where">Select a title to jump to it. New to the demo? Read pages 3 to 5 first, then follow the feature pages in order; they follow the same path as a real review.</p>
-<div class="two">{col(sections[:half], 1)}{col(sections[half:], half + 1)}</div>
-<div class="ok wide"><strong>Reading recommendation for beginners</strong><p>Before you start → Launch → Your first review → Read a software suggestion → Check the cited evidence → Approve a suggestion → Export. Everything else is reference.</p></div>''')
+    return f'<ol class="idx" style="counter-reset: n {start - 1}">' + ''.join(f'<li><a href="#{i}">{e(t)}</a><span class="pg">{pageno[i]}</span></li>' for i, t in items) + '</ol>'
+add('index', 'Contents', f'''<h2>Contents</h2><p class="lede">New here? Read the first three pages, then follow the numbered pages in order. Each one is a single task.</p>
+<div class="two">{col(SECTIONS[:half], 1)}{col(SECTIONS[half:], half + 1)}</div>
+<div class="ok wide"><strong>The shortest path</strong><p>Page {pageno['start']} (Start here) → page {pageno['first']} (Your first review) → page {pageno['export']} (Download the Excel file). That is about four minutes.</p></div>''')
 
-# 3 Prerequisites
-add('prereq', 'Before you start', f'''<h2>Before you start</h2><p class="where">This demo has no accounts, sign-in or API keys. What you need depends on how you open it.</p>
-<div class="cards">
-<div class="card"><h3>To use the demo</h3><p><strong>What it is:</strong> a web browser (the demo was tested in Chromium only) and the demo running at {APP}.</p><p><strong>Where you get it:</strong> the project folder <code>secq-demo</code>, started with the steps on the next page.</p><p><strong>Where you use it:</strong> in the browser address bar.</p></div>
-<div class="card"><h3>To run it yourself</h3><p><strong>What it is:</strong> Node.js with npm (the project was built with Node 24).</p><p><strong>Where you get it:</strong> nodejs.org, or your organisation’s software portal.</p><p><strong>Where you use it:</strong> in a terminal opened in the <code>secq-demo</code> folder.</p></div>
-<div class="card"><h3>To regenerate the data (developers only)</h3><p><strong>What it is:</strong> the Python prototype <code>secq-poc</code> with its virtual environment.</p><p><strong>Where you use it:</strong> <code>npm run data</code>. Normal use does not need it, because the generated data is already in the project.</p></div></div>
-<div class="ok wide"><strong>What you do not need</strong><p>No workspace login, no model-provider key, no integration token, no cloud account and no payment. The demo makes no external calls and uses no AI service. Never put real company files or secrets into it.</p></div>''')
+# ---------------- Start here ----------------
+add('start', 'Start here', f'''<h2>Start here</h2><p class="lede">Questionnaire desk is a demo of a simple idea: software suggests an answer, and <strong>you</strong> decide. Nothing goes into the Excel file until you approve it.</p>
+<div class="three">
+<div class="card"><span class="big-n">1</span><h3>Open the link</h3><p>Use any current web browser on a computer or phone. There is nothing to install and no account to make.</p>{open_link()}</div>
+<div class="card"><span class="big-n">2</span><h3>Review the answers</h3><p>A sample questionnaire with 21 questions loads for you. The software suggests an answer where a fictional company policy supports one.</p></div>
+<div class="card"><span class="big-n">3</span><h3>Download the result</h3><p>Only answers you approved are written into a copy of the Excel file. Everything else stays blank.</p></div></div>
+<div class="ok wide"><strong>Good to know before you start</strong><p>All names, policies and answers are fictional. The matching is simple keyword matching, not artificial intelligence, so many questions will have no suggestion. That is on purpose. Nothing you do is sent anywhere or saved on a server. Please do not use real company files.</p></div>''')
 
-# 4 Launch
-add('launch', 'Launch the app for the first time', f'''<h2>Launch the app for the first time</h2><p class="where"><strong>Where:</strong> a terminal in the <code>secq-demo</code> folder, then your browser. <span class="sep"></span> <strong>Purpose:</strong> get the demo running on your own computer.</p>
-<div class="cols"><div class="left"><pre class="code">npm install
+# ---------------- The screen at a glance (numbered markers on the real screenshot) ----------------
+marks = [
+    ('[data-tour=list]', 1, 'Questions', 'All 21 questions. Click one to open it.'),
+    ('section[aria-label="Review progress"]', 2, 'Progress', 'How many answers you approved, still have to check, or held back.'),
+    ('[data-tour=answer]', 3, 'The suggestion', 'What the software proposes. A dashed edge means nobody has approved it yet.'),
+    ('[data-tour=evidence]', 4, 'Evidence', 'The exact policy sentence behind the suggestion.'),
+    ('[data-tour=actions]', 5, 'Your buttons', 'Approve, edit, reject, or ask for more evidence.'),
+    ('[data-tour=export]', 6, 'Download', 'Writes your approved answers into the Excel file.'),
+]
+badges = ''.join(f'<span class="badge" data-target="{e(sel)}">{n}</span>' for sel, n, _, _ in marks)
+legend = ''.join(f'<li><span class="badge s">{n}</span><div><strong>{e(t)}</strong><span>{e(d)}</span></div></li>' for _, n, t, d in marks)
+add('glance', 'The screen at a glance', f'''<h2>The screen at a glance</h2><p class="lede">This is the main screen once you press “Start the interactive demo”. The numbers match the list on the right.</p>
+<div class="cols glance"><div class="left"><div class="annot">{pic("workspace", 168, 128, 0.3)}{badges}</div></div>
+<div class="right"><ul class="legend">{legend}</ul></div></div>''', 'feature')
+
+# ---------------- First review ----------------
+add('first', 'Your first review in 4 steps', head('Your first review in 4 steps', 'The live demo.', 'Approve two answers and download an Excel file that contains only those two. About four minutes, no cost.')
+    + f'''<div class="cols"><div class="left"><div class="shots row">{pic("evidence-cited", 70, H1, 0.3)}{pic("actions", 70, H1, 0.3)}</div>
+<p class="cap">Left: the evidence for Question 3. Right: the Approve button you will press.</p>{ok_panel("The button at the top right reads “Export Excel (2 approved)”. The file you download has an answer next to exactly those two questions, and the rest is blank.", "What you should end up with")}</div>
+<div class="right">{steps(["Press <strong>Start the interactive demo</strong>, then click <strong>Question 3</strong> in the list.", "Read the highlighted sentence on the right. It says customer data at rest is encrypted. Press <strong>Approve</strong>.", "Click <strong>Question 9</strong> (“Do you test restores from backups?”), read its sentence, press <strong>Approve</strong>.", "Press <strong>Export Excel (2 approved)</strong> at the top right and open the file."])}
+<p class="note">Common mistake: approving without reading the sentence. The software can be wrong; you are the check.</p>{open_link()}</div></div>''', 'feature')
+
+# ---------------- Feature pages ----------------
+feature('welcome', 'Start from the welcome screen', 'The first page when you open the link.',
+        'Explains the idea and lets you try an approval before you open the questionnaire.',
+        f'<div class="stack">{pic("welcome-buttons", W1, 28, 0.3)}{pic("welcome-card", W1, 88, 0.3)}</div>',
+        'Top: the two buttons. Below: a small practice example. It is not part of your questionnaire.',
+        'A practice card with a dashed box that says “Software suggestion, not yet reviewed”.',
+        ['Press <strong>Approve this suggestion</strong> in the practice card. The dashed box becomes a solid, green-edged box.',
+         'Press <strong>Undo approval</strong> to go back. Nothing here is saved.',
+         'Press <strong>Start the interactive demo</strong> to open the real questionnaire, or <strong>Download the sample questionnaire</strong> to get the Excel file.'],
+        'Cost: none. The sample file comes from the same site; nothing is uploaded.', tall=True)
+
+feature('questions', 'Pick a question from the list', 'Left column, titled “Questionnaire”.',
+        'Shows every question with a status, so you can see what still needs you.',
+        f'<div class="row2">{pic("list5", 70, HT, 0.3)}{pic("list5-reviewed", 70, HT, 0.3)}</div>',
+        'Left: before you review. Right: after approving Questions 1 and 3. The selected row has a dark outline.',
+        'The row you click is outlined, and the middle and right columns show that question.',
+        ['Click any question. You can also use the Up and Down arrow keys, Home and End.',
+         'Read the status label under it. “Suggested, needs review” means the software drafted an answer. “Needs your judgment” and “No supporting evidence” mean it drafted nothing.',
+         'Work through the questions in any order.'],
+        'In this sample, 5 questions get a suggestion, 2 need your judgment and 14 have none.', tall=True)
+
+feature('progress', 'Follow your progress', 'Top of the middle column.',
+        'Counts what you approved, what is still waiting, and what you held back.',
+        f'<div class="stack">{pic("stats-empty", W1, 40, 0.3)}{pic("stats-reviewed", W1, 40, 0.3)}</div>',
+        'Top: at the start. Bottom: after approving three, rejecting one and holding one.',
+        'Approved goes up when you approve. Held back counts rejected answers and “needs more evidence” answers.',
+        ['Approve, reject or hold a question (the next pages show how).',
+         'Watch the three numbers change.',
+         'The row of small bars is a map of all 21 questions: green is approved, red is rejected, amber is held back, grey is untouched.'],
+        'These numbers are for this session only. They are not customer data.')
+
+feature('suggestion', 'Read a suggested answer', 'Middle column, the big box under the question.',
+        'Shows what the software proposes, and that nobody has approved it yet.',
+        pic("answer-q3", W1, H1, 0.3),
+        'Question 3. The dashed, striped edge means “suggestion, not approved”.',
+        'An answer such as “Yes”, the title “Software suggestion, not yet reviewed”, and a line naming the policy it comes from.',
+        ['Click <strong>Question 3</strong>, “Is customer data encrypted at rest?”.',
+         'Read the answer and the line that names the policy it cites.',
+         'Do not treat it as final. The next pages show how to check it.'],
+        'The software only matches keywords. It is not AI and has not been checked by an expert.')
+
+feature('flags', 'When the software drafts nothing', 'Middle column, above the answer box.',
+        'Explains why a question has no suggestion, so a gap is never filled with a guess.',
+        pic("answer-q2", W1, H1, 0.3),
+        'Question 2: the closest policy sentence is negative or conditional, so nothing is drafted. Question 1 looks the same, but its note says no supporting evidence was found.',
+        'The answer box says “No suggested answer”, and the Approve button is greyed out.',
+        ['Click <strong>Question 1</strong> or <strong>Question 2</strong>.',
+         'Read the note. It tells you whether the software found a doubtful sentence or nothing at all.',
+         'If a policy does cover the question, write the answer yourself (see “Write your own answer”).'],
+        'On purpose: the demo prefers a blank to a guess.')
+
+feature('evidence', 'Check the evidence', 'Right column, “Cited evidence”.',
+        'Shows the exact policy sentence behind a suggestion, with the document, version and date.',
+        pic('evidence-cited', W1, HT, 0.42),
+        'The yellow highlight is the exact source sentence. It is set in a different typeface so it looks like quoted text.',
+        'A card with the policy name (Encryption Standard v1.4), its status, and the highlighted sentence.',
+        ['Click a question that has a suggestion, such as <strong>Question 3</strong>.',
+         'Compare the highlighted sentence with the question. Check the version and the “Status” line.',
+         'If the sentence does not really answer the question, do not approve it.'],
+        'All six policies are fictional.', tall=True)
+
+feature('library', 'Browse the policy library', 'Right column, “Evidence library”.',
+        'Lists all six fictional policies so you can find support the software missed.',
+        pic('library', W1, HT, 0.42),
+        'The Encryption Standard is open because Question 3 cites it. The cited sentence is highlighted.',
+        'Each policy opens to show its version, review date and its passages.',
+        ['Click a policy name to open it.',
+         'Read its passages. They are fixed text and cannot be edited.',
+         'Found the support for a question the software missed? Use it in “Write your own answer”.'],
+        'The library has 6 policies and 18 passages, built into the demo.', tall=True)
+
+feature('approve', 'Approve an answer', 'Right column, “Reviewer actions”.',
+        'Records that you checked the answer and its evidence. Only approved answers are downloaded.',
+        f'<div class="stack">{pic("answer-approved", W1, 60, 0.3)}{pic("actions", W1, 54, 0.3)}</div>',
+        'Top: Question 3 after approving. Solid green edge, and a note that it will be written to the Excel file. Bottom: the buttons.',
+        'The box title changes to “Approved answer”, and the Export button counts it.',
+        ['Click <strong>Question 3</strong> and check its evidence.',
+         'Press <strong>Approve</strong>. It is greyed out if there is no answer yet.',
+         'Changed your mind? Press <strong>Restore the original suggestion</strong> to undo all your changes to this question.'],
+        'Approving is your decision. The demo does not claim any expert reviewed the answer.', tall=True)
+
+feature('hold', 'Reject, or ask for more evidence', 'Right column, “Reviewer actions”.',
+        'Keeps weak or unsupported answers out of the Excel file.',
+        pic('answer-rejected', W1, 70, 0.4),
+        'A rejected answer. Its cell stays blank in the Excel file.',
+        'The label says “Rejected, will not export” or “More evidence needed”.',
+        ['Open a question whose evidence does not support the answer.',
+         'Press <strong>Reject</strong> to throw the suggestion away, or <strong>Needs more evidence</strong> if you need a better policy first.',
+         'You can still change your mind later and press Approve.'],
+        'Rejected and held answers are never downloaded.')
+
+feature('edit', 'Write your own answer', 'Right column: Reviewer actions → “Edit answer”.',
+        'Lets you answer a question the software missed, or fix a suggestion, and link it to a policy sentence.',
+        pic('edit-form', W1, HT, 0.4),
+        'The edit form. The Yes / No / N/A choice matches the dropdown in the Excel file.',
+        'After you press “Save edit” the label reads “Edited, needs approval”, and the box is dashed again.',
+        ['Press <strong>Edit answer</strong>. Choose Yes, No or N/A. A comment is optional.',
+         'Under “Cited evidence” pick the policy sentence that supports your answer.',
+         'Press <strong>Save edit</strong>, then press <strong>Approve</strong>. Saving does not approve it.'],
+        'Every edit cancels an earlier approval. If you cite nothing, the Excel file says “Source: none cited; answer entered by the reviewer.”', tall=True)
+
+# Export page with a real table from the exported file
+def export_table():
+    p = os.path.join(IMG, 'export.xlsx')
+    if not os.path.exists(p): return ''
+    import openpyxl
+    ws = openpyxl.load_workbook(p)['Questionnaire']
+    out = ['<table class="sheet"><tr><th>ID</th><th>Question</th><th>Response</th><th>Comments / Evidence</th></tr>']
+    for r in range(2, 6):
+        c = [ws.cell(r, i).value or '' for i in range(1, 5)]
+        com = c[3] if len(c[3]) < 120 else c[3][:117] + '…'
+        out.append(f'<tr><td>{e(str(c[0]))}</td><td>{e(str(c[1]))}</td><td>{e(str(c[2]))}</td><td>{e(com)}</td></tr>')
+    return ''.join(out) + '</table>'
+feature('export', 'Download the Excel file', 'Top right: “Export Excel (N approved)”.',
+        'Writes only your approved answers into a copy of the sample Excel file, keeping its formatting.',
+        f'<div class="stack">{pic("export-button", 80, 18, 0.45)}{export_table()}</div>',
+        'The button, and the first rows of a real downloaded file. Question 2 was not approved, so it is blank.',
+        'A file called Northwind-Security-Questionnaire-reviewed.xlsx downloads. Approved rows have an answer and a “Source:” note.',
+        ['Approve at least one answer. The button is greyed out while the count is 0.',
+         'Press <strong>Export Excel (N approved)</strong>. Your browser saves the file.',
+         'Open it in Excel and check the Response and Comments columns.'],
+        'Kept: sheet order, column widths, row heights, merged cells, dropdowns, colours and frozen panes (checked on the sample only). Not supported: images, charts and macros.')
+
+feature('tour', 'Take the guided tour', 'Left sidebar, compass icon “Guided tour”.',
+        'A five-step walk through the screen that outlines each area for you.',
+        f'<div class="row2 center">{pic("tour", 74, 60, 0.3)}{pic("sidebar-tour", 56, 60, 0.45)}</div>',
+        'Left: the tour card. Right: the sidebar icon and its label.',
+        'A card “Review the questionnaire”, step 1 of 5, and the question list gets an outline.',
+        ['Press the compass icon <strong>Guided tour</strong>. On a phone it is a button under the title.',
+         'Press <strong>Next</strong> and <strong>Back</strong> to move between the five steps.',
+         'Press <strong>Finish</strong> at the end, or <strong>End the guide</strong> (or Esc) at any time.'],
+        'From step 2 the tour opens Question 3 for you. It does not erase your choices.')
+
+feature('limits', 'Read the limits', 'Left sidebar, “i” icon “Limits”.',
+        'One place that lists what the Excel file keeps, what it cannot handle, and how matching works.',
+        pic('limits', 120, HT, 0.3),
+        'The Limits window.',
+        'A window titled “What this demo can and cannot do”.',
+        ['Press the “i” icon <strong>Limits</strong>.',
+         'Read what the export keeps and what it does not support.',
+         'Press <strong>Close</strong>, press Esc, or click outside the window.'],
+        'Fidelity was checked on this sample file only, not promised for every workbook.', tall=True)
+
+feature('mobile', 'Use it on a phone', 'Any screen narrower than a laptop.',
+        'The three columns become three tabs so everything stays readable.',
+        f'<div class="row2 center">{pic("mobile-questions", 66, HT, 0.3)}{pic("mobile-evidence", 66, HT, 0.3)}</div>',
+        'Left: the question list. Right: after tapping Question 3 and the “Evidence and review” tab.',
+        'Three tabs at the bottom: Questions, Answer, and Evidence and review.',
+        ['Tap a question. The app moves to the Answer tab.',
+         'Tap <strong>Evidence and review</strong> to see the evidence and the buttons.',
+         'Tap <strong>Export Excel</strong> at the top when you are done.'],
+        'Tested in a phone-sized browser, not on real phones. The live site shows the app a little smaller than these pictures.', tall=True)
+
+feature('reset', 'Start over', 'Left sidebar, circular-arrow icon “Reset demo”.',
+        'Clears every approval, rejection, edit and hold so you can run the demo again.',
+        f'<div class="row2 center">{pic("sidebar-reset", 80, 80, 0.5)}</div>',
+        'The sidebar: Guided tour, Limits and Reset demo. A label shows when you point at an icon.',
+        'A short message “Demo reset. All review choices were cleared.”, and Export Excel greys out again.',
+        ['Press <strong>Reset demo</strong>.',
+         'Check that the count says 0 approved.',
+         'Your choices stay if you reload the page, but they are kept only in this browser tab, so closing the tab also clears them.'],
+        'Nothing is saved on a server and nothing is shared between tabs or devices.')
+
+# ---------------- Developers ----------------
+add('dev', 'For developers: run it yourself', head('For developers: run it yourself', 'A terminal in the <code>secq-demo</code> folder.', 'Run the demo on your own computer, and check that it still behaves as described. These are commands, not screens.')
+    + f'''<div class="cols"><div class="left"><pre class="code">npm install
 npm run build
-npm run serve
-# the terminal prints:  http://localhost:3100</pre>
-<p class="cap">Run the three commands in order. Leave the terminal open while you use the demo. For development, <code>npm run dev</code> serves the same address.</p>
-<div class="ok"><strong>How you confirm it worked</strong><p>The terminal prints the address, and opening it in your browser shows the welcome screen with the headline “Security questionnaires answered from your approved policies”.</p></div></div>
-<div class="right">{steps_html(["Open a terminal in the secq-demo folder and run npm install once. Then run npm run build.","Run npm run serve. It starts a small local web server on port 3100.","Open http://localhost:3100/ in your browser and select “Start the interactive demo”."])}<p class="note">If the address does not open, see Troubleshooting. Nothing here costs money or sends data off your computer.</p><a class="open" href="{APP}">Open this part of the app</a><p class="hint">Works while the app is running locally.</p></div></div>''')
+npm run serve          # opens http://localhost:3100
 
-# 5 First workflow
-add('first', 'Your first review, end to end', f'''<h2>Your first review, end to end</h2><p class="where"><strong>Goal:</strong> approve two answers and download an Excel file that contains only those two. About four minutes. <strong>Cost:</strong> none.</p>
-<div class="cols"><div class="left"><div class="shots n2 row">{img("evidence-cited", "tall")}{img("actions", "tall")}</div><p class="cap">Left: the evidence for Question 3, with the exact sentence highlighted. Right: the reviewer actions, where you select Approve.</p>
-<div class="ok"><strong>Expected result</strong><p>“Export Excel (2 approved)” is enabled and the downloaded workbook has an answer in the Response column for exactly those two questions. Every other row is blank.</p></div></div>
-<div class="right">{steps_html(["Select “Start the interactive demo”, then Question 3. Check that the highlighted evidence says customer data at rest is encrypted with AES-256, then select “Approve”.","Select Question 9, “Do you test restores from backups?”. Check its cited passage, then select “Approve”.","Select “Export Excel (2 approved)”, then open the downloaded file and confirm only those two rows have answers and a “Source:” line."])}<p class="note"><strong>Common mistakes:</strong> approving without reading the passage; expecting answers for every question (most have none by design); looking for the file before the browser finished downloading.</p><a class="open" href="{APP}">Open this part of the app</a><p class="hint">Works while the app is running locally.</p></div></div>''')
+npm run test:unit      # matcher, review rules, export check
+npm run test:e2e       # browser tests, desktop and phone
+npm run data           # rebuild data from the Python prototype</pre>
+<p class="cap">The code is at github.com/itzrohithq-wq/Questionnaire-Desk. Pushing to its main branch redeploys the live site on Vercel.</p>{ok_panel("The terminal prints http://localhost:3100. The unit tests list 36 passing; the browser tests list 25 passing and 5 skipped on purpose.", "What you should see")}</div>
+<div class="right">{steps(["Run <code>npm install</code> once, then <code>npm run build</code>.", "Run <code>npm run serve</code> and open http://localhost:3100.", "Run the tests whenever you change something."])}
+<p class="note"><strong>Local upload switch:</strong> set the build variable <code>NEXT_PUBLIC_ALLOW_UPLOAD=1</code> to show a file chooser for your own fictional .xlsx files. The live site never has it. Never load real customer files.</p></div></div>''', 'feature')
 
-num = 6
-for f in F:
-    feature(f, num); num += 1
-
-# Developer pages
-add('dev', 'Run the tests and rebuild data', f'''<h2>For developers: run the tests and rebuild data</h2><p class="where"><strong>Where:</strong> a terminal in the <code>secq-demo</code> folder. <span class="sep"></span> <strong>Purpose:</strong> prove the demo still behaves as described. There is no graphical interface for this; these are commands.</p>
-<div class="cols"><div class="left"><pre class="code">npm run test:unit   # matcher parity with the Python engine, review rules,
-                    # export + fidelity check
-npm run test:e2e    # browser tests, desktop and mobile
-npm run data        # rebuild src/data from secq-poc (needs its venv)</pre>
-<p class="cap">The unit tests compare every suggestion with the Python prototype’s saved results and run the prototype’s fidelity checker on an exported workbook. The browser tests use an already-installed Chromium; set CHROMIUM_PATH to use another.</p>
-<div class="ok"><strong>What you should see</strong><p>Vitest lists 35 passing tests. Playwright lists passing desktop and mobile tests; three desktop-only tests are skipped by design on mobile.</p></div></div>
-<div class="right">{steps_html(["Run npm run build, then npm run test:unit.","Run npm run test:e2e. The test configuration starts the static server for you.","Only if the policies or sample workbook change, run npm run data and rebuild."])}<p class="note">Last run before this guide was published: 35 unit tests and 23 browser tests passed, with 3 browser tests skipped by design. The suite also checks that sidebar tooltips are not covered by page content.</p></div></div>''')
-
-add('upload', 'The local-only upload switch', f'''<h2>For developers: the local-only upload switch</h2><p class="where"><strong>Where:</strong> a build-time setting. <span class="sep"></span> <strong>Purpose:</strong> let a developer test the importer with their own fictional .xlsx. The default and public build has no upload control.</p>
-<div class="cols"><div class="left"><pre class="code"># PowerShell, local testing only, fictional files only
-$env:NEXT_PUBLIC_ALLOW_UPLOAD = "1"
-npm run build
-npm run serve</pre>
-<p class="cap">With the setting, a file chooser appears under the title in the workspace. Without it, no file chooser exists (an automated test checks this).</p>
-<div class="ok"><strong>What you should see</strong><p>“Local testing only, fictional files only:” followed by a file chooser. Loading a workbook shows a message “Loaded &lt;file name&gt; for local testing.”</p></div></div>
-<div class="right">{steps_html(["Set the variable and rebuild. The setting is read at build time, so a running app will not pick it up.","Choose a fictional .xlsx whose header row contains a question column and a response or answer column.","Run npm run build again without the variable before sharing the build with anyone."])}<p class="note"><strong>Limit:</strong> never load a real customer questionnaire. Real-file handling has not been reviewed or approved. Uploaded workbooks are matched against the same six fictional policies only.</p></div></div>''')
-
-# Troubleshooting
+# ---------------- Troubleshooting ----------------
 tr = [
- ('The address does not open', 'The server is not running, or port 3100 is in use.', 'Run npm run build, then npm run serve, and keep that terminal open. Set the PORT environment variable to pick another port.'),
- ('“Start the interactive demo” shows an error', 'The sample file could not be fetched.', 'Check that public/sample/Northwind-Security-Questionnaire.xlsx exists in the build (out/sample) and rebuild.'),
- ('Approve is disabled', 'There is no answer yet, or the answer is not Yes, No or N/A for a dropdown question.', 'Select “Edit answer”, choose a value, save, then approve.'),
- ('“Export Excel (0 approved)” is disabled', 'Nothing is approved. Edited, rejected and held answers do not count.', 'Approve at least one answer.'),
- ('An approved answer disappeared from the count', 'You edited it. Every edit withdraws approval.', 'Select “Approve” again after saving.'),
- ('The export has an unexpected “none cited” line', 'The approved answer cites no policy passage.', 'Edit the answer, choose a passage in “Cited evidence”, save and approve again.'),
- ('Choices vanished', 'You pressed “Reset demo” or closed the tab. Choices live in that tab’s session storage only.', 'Redo the review. There is no server copy.'),
- ('Tests cannot launch a browser', 'The Playwright browser revision does not match the installed one.', 'Set CHROMIUM_PATH to an installed Chromium, or install the matching browser with your approval.'),
- ('There is no sign-in, permission or integration to fix', 'The demo has none. If you expected them, you may be thinking of the full product, which does not exist yet.', 'Nothing to configure.'),
+    ('The link does not open', 'No internet, or a company filter blocks vercel.app.', 'Try another network or browser. Check the address is exactly ' + LIVE),
+    ('“Start the interactive demo” shows an error', 'The sample file did not download.', 'Reload the page and try again.'),
+    ('Approve is greyed out', 'There is no answer yet.', 'Press “Edit answer”, choose Yes, No or N/A, save, then approve.'),
+    ('“Export Excel (0 approved)” is greyed out', 'Nothing is approved. Edited, rejected and held answers do not count.', 'Approve at least one answer.'),
+    ('An approved answer stopped counting', 'You edited it. Every edit cancels the approval.', 'Press Approve again after saving.'),
+    ('The Excel file says “none cited”', 'The approved answer has no policy sentence attached.', 'Edit the answer, choose a sentence under “Cited evidence”, save, approve.'),
+    ('My choices are gone', 'You pressed Reset demo or closed the tab.', 'Start again. Choices are kept only in that browser tab.'),
+    ('There is no sign-in or permission to fix', 'The demo has none. You may be thinking of a full product, which does not exist yet.', 'Nothing to set up.'),
 ]
 rows = ''.join(f'<tr><td>{e(a)}</td><td>{e(b)}</td><td>{e(c)}</td></tr>' for a, b, c in tr)
-add('trouble', 'Troubleshooting', f'<h2>Troubleshooting</h2><p class="where">Find the symptom, check the likely cause, then apply the fix.</p><table class="tt"><tr><th>Symptom</th><th>Likely cause</th><th>What to do</th></tr>{rows}</table>')
+add('trouble', 'If something goes wrong', f'<h2>If something goes wrong</h2><p class="lede">Find what you see in the first column, then follow the last column.</p><table class="tt"><tr><th>What you see</th><th>Likely reason</th><th>What to do</th></tr>{rows}</table>')
 
-# Readiness
-add('ready', 'Readiness checklist', f'''<h2>Readiness checklist</h2><p class="where">Check these before you show the demo to anyone.</p>
-<div class="three"><div class="card"><h3>Before real use</h3><ul class="check"><li>The app opens at {APP} and the welcome screen loads.</li><li>You can approve, reject, edit and restore a question.</li><li>An export with 2 approvals has exactly 2 answers.</li><li>You told the viewer it is keyword matching, not AI.</li><li>No real company files are loaded.</li></ul></div>
-<div class="card"><h3>What this guide covers</h3><ul><li>Every control in the workspace and the welcome screen.</li><li>Launch, first review, export, tour, limits, phone layout and reset.</li><li>Developer commands for tests, data and the local upload switch.</li></ul><h3>Still needs external setup</h3><ul><li>Public hosting: not done. Needs an account and your approval.</li><li>Real-file handling, accounts and billing: not built.</li><li>Human expert review: not part of the software.</li></ul></div>
-<div class="card"><h3>Known limits and verification boundaries</h3><ul><li>Matching is keyword matching. In the sample, 5 of 21 questions get a suggestion.</li><li>Export fidelity was checked on the sample workbook with the prototype’s checker, which cannot see images, charts or macros.</li><li>Tested in an automated Chromium on desktop and a 390 px phone profile; not on physical devices or other browsers.</li><li>Screens in this guide are real captures of the running app with fictional data.</li><li>This is not a Tango export.</li></ul><h3>Links</h3><p><a href="{APP}">{APP}</a> (local only)</p></div></div>''')
+# ---------------- Checklist ----------------
+add('ready', 'Checklist and limits', f'''<h2>Checklist and limits</h2><p class="lede">Check these before you show the demo to someone else.</p>
+<div class="three"><div class="card"><h3>Before you show it</h3><ul class="check"><li>{LIVE} opens and shows the welcome screen.</li><li>You can approve, reject, edit and restore a question.</li><li>A download with 2 approvals has exactly 2 answers.</li><li>You told people it is keyword matching, not AI.</li><li>No real company files are used.</li></ul></div>
+<div class="card"><h3>What this guide covers</h3><ul><li>Every control in the live demo, in the order you meet it.</li><li>Starting, reviewing, downloading, the tour, the limits, phones and reset.</li><li>Developer commands for running and testing it.</li></ul><h3>Not part of the demo</h3><ul><li>Accounts, billing and real-file upload.</li><li>An expert human review. That is a separate service idea, not this software.</li></ul></div>
+<div class="card"><h3>Limits and what was checked</h3><ul><li>In the sample, 5 of 21 questions get a suggestion.</li><li>The Excel file was checked on the sample only; images, charts and macros are not supported.</li><li>Tested in Chromium on a computer and in a phone-sized window, not on real phones or other browsers.</li><li>Pictures in this guide are real screens of the live site, shown at 100% size.</li><li>This is not a Tango export.</li></ul><h3>Link</h3><p><a href="{LIVE}">{LIVE}</a></p></div></div>''')
 
 by = {p[0]: p for p in pages}
 body = ''.join(by[i][2].replace('{n}', str(k)) for k, i in enumerate(order, 1))
-
 css = open(os.path.join(HERE, 'guide.css'), encoding='utf8').read()
-open(os.path.join(HERE, 'guide.html'), 'w', encoding='utf8').write(f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Questionnaire desk user guide</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>{css}</style></head><body>{body}</body></html>')
+appcss = open(os.path.join(HERE, 'app.css'), encoding='utf8').read()
+# Tailwind v4 registers its --tw-* defaults (e.g. border style = solid) with @property; those only take effect at document level, so lift them out of the shadow-root sheet.
+import re
+css += chr(10) + chr(10).join(re.findall(r'@property\s+--[\w-]+\s*\{[^}]*\}', appcss))
+script = open(os.path.join(HERE, 'guide.js'), encoding='utf8').read()
+open(os.path.join(HERE, 'guide.html'), 'w', encoding='utf8').write(
+    f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Questionnaire desk user guide</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>{css}</style><style id="app-css" media="not all">{appcss}</style></head><body>{body}<script>{script}</script></body></html>')
 print(len(order), 'pages')

@@ -9,7 +9,7 @@ const b = await chromium.launch({ executablePath: exe })
 const p = await b.newPage({ viewport: { width: 1123, height: 794 } })
 await p.goto(pathToFileURL(`${dir}guide.html`).href)
 await p.evaluate(() => document.fonts.ready)
-await p.waitForFunction(() => [...document.images].every((i) => i.complete && i.naturalWidth > 0))
+await p.waitForFunction(() => window.__visReady === true)
 
 const problems = await p.evaluate(() => {
   const out = []
